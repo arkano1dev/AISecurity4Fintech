@@ -1,10 +1,11 @@
 title = "gitleaks config"
 
 [allowlist]
-  description = "Allow test and example data"
+  description = "Allow test, example, and local-dev data"
   paths = [
-    "**/.env.example",
-    "**/README.md",
-    "**/docs/**",
-    "**/tests/**"
+    "^.*\\/.env\\.example$",
+    "^.*\\/README\\.md$",
+    "^.*\\/docs\\/.*$",
+    "^.*\\/tests\\/.*$",
+    "^.*\\/infra\\/docker-compose\\/.*$"
   ]
