@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from typing import Any, cast
 
 import pytest
-from fastapi.testclient import TestClient
-
 from audit_log.api import make_app
 from audit_log.chain import canonical_json
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -19,12 +19,27 @@ def client() -> TestClient:
 def test_audit_record_written(client: TestClient) -> None:
     response = client.post(
         "/audit/append",
-        json={"actor_sub": "u1", "tenant": "acme", "action": "query.executed", "payload": {"q": "hi"}},
+        json={
+            "actor_sub": "u1",
+            "tenant": "acme",
+            "action": "query.executed",
+            "payload": {"q": "hi"},
+        },
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) >= {"id", "seq", "timestamp", "actor_sub", "tenant_id", "action", "payload_hash", "prev_hash", "hash"}
+    assert set(body) >= {
+        "id",
+        "seq",
+        "timestamp",
+        "actor_sub",
+        "tenant_id",
+        "action",
+        "payload_hash",
+        "prev_hash",
+        "hash",
+    }
     assert body["seq"] == 1
     assert body["prev_hash"] == "0" * 64
     record_without_hash = {
@@ -38,7 +53,9 @@ def test_audit_record_written(client: TestClient) -> None:
         "payload_hash": body["payload_hash"],
         "prev_hash": body["prev_hash"],
     }
-    expected_hash = hashlib.sha256((body["prev_hash"] + canonical_json(record_without_hash)).encode("utf-8")).hexdigest()
+    expected_hash = hashlib.sha256(
+        (body["prev_hash"] + canonical_json(record_without_hash)).encode("utf-8")
+    ).hexdigest()
     assert body["hash"] == expected_hash
 
 
@@ -46,7 +63,12 @@ def test_chain_appends_correctly(client: TestClient) -> None:
     responses = [
         client.post(
             "/audit/append",
-            json={"actor_sub": f"u{i}", "tenant": "acme", "action": "query.executed", "payload": {"q": f"q{i}"}},
+            json={
+                "actor_sub": f"u{i}",
+                "tenant": "acme",
+                "action": "query.executed",
+                "payload": {"q": f"q{i}"},
+            },
         )
         for i in range(1, 4)
     ]
@@ -63,7 +85,12 @@ def test_chain_verification_passes(client: TestClient) -> None:
     for i in range(3):
         response = client.post(
             "/audit/append",
-            json={"actor_sub": f"u{i}", "tenant": "acme", "action": "query.executed", "payload": {"q": f"q{i}"}},
+            json={
+                "actor_sub": f"u{i}",
+                "tenant": "acme",
+                "action": "query.executed",
+                "payload": {"q": f"q{i}"},
+            },
         )
         assert response.status_code == 201
 
@@ -79,43 +106,64 @@ def test_tamper_detection(client: TestClient) -> None:
     for i in range(5):
         response = client.post(
             "/audit/append",
-            json={"actor_sub": f"u{i}", "tenant": "acme", "action": "query.executed", "payload": {"q": f"q{i}"}},
+            json={
+                "actor_sub": f"u{i}",
+                "tenant": "acme",
+                "action": "query.executed",
+                "payload": {"q": f"q{i}"},
+            },
         )
         assert response.status_code == 201
 
-    store = client.app.state.audit_store
+    store = cast(Any, client).app.state.audit_store
     # mutate middle row directly
     target = store.records[2]
     target["payload"] = {"q": "tampered"}
-    target["payload_hash"] = hashlib.sha256(json.dumps(target["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
-    target["hash"] = hashlib.sha256((target["prev_hash"] + canonical_json({
-        "id": target["id"],
-        "seq": target["seq"],
-        "timestamp": target["timestamp"],
-        "actor_sub": target["actor_sub"],
-        "tenant_id": target["tenant_id"],
-        "action": target["action"],
-        "payload": target["payload"],
-        "payload_hash": target["payload_hash"],
-        "prev_hash": target["prev_hash"],
-    })).encode("utf-8")).hexdigest()
+    target["payload_hash"] = hashlib.sha256(
+        json.dumps(
+            target["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    ).hexdigest()
+    target["hash"] = hashlib.sha256(
+        (
+            target["prev_hash"]
+            + canonical_json(
+                {
+                    "id": target["id"],
+                    "seq": target["seq"],
+                    "timestamp": target["timestamp"],
+                    "actor_sub": target["actor_sub"],
+                    "tenant_id": target["tenant_id"],
+                    "action": target["action"],
+                    "payload": target["payload"],
+                    "payload_hash": target["payload_hash"],
+                    "prev_hash": target["prev_hash"],
+                }
+            )
+        ).encode("utf-8")
+    ).hexdigest()
 
     response = client.get("/audit/verify")
     assert response.status_code == 200
     payload = response.json()
     assert payload["valid"] is False
-    assert payload["first_broken_at"] == 2
+    assert payload["first_broken_at"] == 3
 
 
 def test_append_only_enforced_at_db_layer(client: TestClient) -> None:
     client.post(
         "/audit/append",
-        json={"actor_sub": "u1", "tenant": "acme", "action": "query.executed", "payload": {"q": "hi"}},
+        json={
+            "actor_sub": "u1",
+            "tenant": "acme",
+            "action": "query.executed",
+            "payload": {"q": "hi"},
+        },
     )
-    store = client.app.state.audit_store
-    with pytest.raises(Exception):
+    store = cast(Any, client).app.state.audit_store
+    with pytest.raises(ValueError):
         store.update_one(seq=1, payload={"q": "hacked"})
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         store.delete_one(seq=1)
 
 
@@ -127,4 +175,7 @@ def test_canonical_json_is_deterministic() -> None:
     right_json = canonical_json(right)
 
     assert left_json == right_json
-    assert hashlib.sha256(left_json.encode("utf-8")).hexdigest() == hashlib.sha256(right_json.encode("utf-8")).hexdigest()
+    assert (
+        hashlib.sha256(left_json.encode("utf-8")).hexdigest()
+        == hashlib.sha256(right_json.encode("utf-8")).hexdigest()
+    )
