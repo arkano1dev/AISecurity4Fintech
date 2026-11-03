@@ -1,0 +1,10 @@
+users:
+  alice:
+    password: correct-horse
+    scopes:
+      - chat:send
+      - account:read
+  bob:
+    password: correct-horse-2
+    scopes:
+      - chat:send
