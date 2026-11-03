@@ -1,0 +1,28 @@
+[project]
+name = "aisecurity4fintech"
+version = "0.1.0"
+description = "AI security platform for fintech workloads"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+  "services/audit-log",
+  "packages/py-shared",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+pythonpath = ["services/audit-log/src", "packages/py-shared/src"]
+addopts = "-ra --cov=. --cov-fail-under=0"

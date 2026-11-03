@@ -1,0 +1,10 @@
+title = "gitleaks config"
+
+[allowlist]
+  description = "Allow test and example data"
+  paths = [
+    "**/.env.example",
+    "**/README.md",
+    "**/docs/**",
+    "**/tests/**"
+  ]
