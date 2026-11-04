@@ -24,5 +24,10 @@ python_version = "3.12"
 strict = true
 
 [tool.pytest.ini_options]
-pythonpath = ["services/audit-log/src", "packages/py-shared/src"]
+pythonpath = [
+  "services/audit-log/src",
+  "packages/py-shared/src",
+  "services/auth-service/src",
+  "apps/agentflow/src",
+]
 addopts = "-ra --cov=. --cov-fail-under=0"

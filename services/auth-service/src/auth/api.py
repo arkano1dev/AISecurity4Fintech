@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -21,7 +20,9 @@ def make_app() -> FastAPI:
         if user is None or user.get("password") != payload.password:
             raise HTTPException(status_code=401, detail="invalid_credentials")
 
-        token = issue_token({"username": payload.username}, ["agentflow"], list(user.get("scopes", [])))
+        token = issue_token(
+            {"username": payload.username}, ["agentflow"], list(user.get("scopes", []))
+        )
         return TokenResponse(
             access_token=token,
             token_type="Bearer",

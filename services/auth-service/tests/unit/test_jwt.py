@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import jwt
-import pytest
-
-from auth.keys import get_active_private_key
 from auth.jwt import issue_token, verify_token
+from auth.keys import get_active_private_key
 
 
 def test_issue_token_has_required_claims() -> None:
@@ -16,7 +14,7 @@ def test_issue_token_has_required_claims() -> None:
     assert payload["sub"] == "alice"
     assert payload["iss"] == "auth"
     assert payload["aud"] == "agentflow"
-    assert payload["exp"] > datetime.now(timezone.utc).timestamp()
+    assert payload["exp"] > datetime.now(UTC).timestamp()
     assert payload["jti"]
     assert payload["scopes"] == ["chat:send", "account:read"]
 
@@ -29,7 +27,14 @@ def test_issue_token_uses_rs256_alg_header() -> None:
 def test_verify_rejects_hs256_alg() -> None:
     key = "super-secret-key"
     token = jwt.encode(
-        {"sub": "alice", "scopes": ["chat:send"], "iss": "auth", "aud": "agentflow", "exp": 9999999999, "jti": "hs256-1"},
+        {
+            "sub": "alice",
+            "scopes": ["chat:send"],
+            "iss": "auth",
+            "aud": "agentflow",
+            "exp": 9999999999,
+            "jti": "hs256-1",
+        },
         key,
         algorithm="HS256",
     )
@@ -40,7 +45,14 @@ def test_verify_rejects_hs256_alg() -> None:
 
 def test_verify_rejects_none_alg() -> None:
     token = jwt.encode(
-        {"sub": "alice", "scopes": ["chat:send"], "iss": "auth", "aud": "agentflow", "exp": 9999999999, "jti": "none-1"},
+        {
+            "sub": "alice",
+            "scopes": ["chat:send"],
+            "iss": "auth",
+            "aud": "agentflow",
+            "exp": 9999999999,
+            "jti": "none-1",
+        },
         key=None,
         algorithm="none",
     )
