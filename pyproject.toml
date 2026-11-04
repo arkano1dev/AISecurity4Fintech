@@ -9,6 +9,7 @@ dependencies = []
 [tool.uv.workspace]
 members = [
   "services/audit-log",
+  "services/pii-proxy",
   "packages/py-shared",
 ]
 
@@ -26,6 +27,7 @@ strict = true
 [tool.pytest.ini_options]
 pythonpath = [
   "services/audit-log/src",
+  "services/pii-proxy/src",
   "packages/py-shared/src",
   "services/auth-service/src",
   "apps/agentflow/src",

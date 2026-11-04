@@ -75,6 +75,7 @@ The same design pattern applies wherever AI supports human decision-making but m
 - apps/vaultrag — secure retrieval workflows for compliance and analyst-facing search
 - apps/agentflow — multi-agent customer support and operational orchestration
 - services/audit-log — append-only, hash-linked audit service for sensitive actions
+- services/pii-proxy — shared PII redaction and encrypted vault flow for regulated payloads
 - packages/py-shared — common logging, settings, and tracing utilities
 - docs/adr — architecture decisions and trade-offs
 - docs/threat-model — current system risk model and control mapping
