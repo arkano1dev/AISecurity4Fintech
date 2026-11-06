@@ -67,11 +67,13 @@ def verify_token(token: str, expected_audience: str) -> VerifyResult:
     except (InvalidAlgorithmError, InvalidTokenError, ValueError):
         return VerifyResult(valid=False, reason="invalid_signature")
 
+    exp_raw = payload.get("exp")
+    exp_value = int(exp_raw) if exp_raw is not None else None
     return VerifyResult(
         valid=True,
         sub=str(payload.get("sub")),
         tenant=str(payload.get("tenant")) if payload.get("tenant") is not None else None,
         scopes=list(payload.get("scopes", [])),
-        exp=int(payload.get("exp")) if payload.get("exp") is not None else None,
+        exp=exp_value,
         jti=str(payload.get("jti")) if payload.get("jti") is not None else None,
     )

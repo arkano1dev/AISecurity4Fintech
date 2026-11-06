@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -20,14 +20,13 @@ def make_app() -> FastAPI:
         if user is None or user.get("password") != payload.password:
             raise HTTPException(status_code=401, detail="invalid_credentials")
 
-        token = issue_token(
-            {"username": payload.username}, ["agentflow"], list(user.get("scopes", []))
-        )
+        scopes = cast(list[str], user.get("scopes", []))
+        token = issue_token({"username": payload.username}, ["agentflow"], scopes)
         return TokenResponse(
             access_token=token,
             token_type="Bearer",
             expires_in=900,
-            scope=" ".join(user.get("scopes", [])),
+            scope=" ".join(scopes),
         )
 
     @app.get("/auth/.well-known/jwks.json")
@@ -36,8 +35,8 @@ def make_app() -> FastAPI:
 
         return get_public_jwk_set()
 
-    @app.post("/auth/verify")
-    def verify(payload: VerifyRequest) -> dict[str, Any]:
+    @app.post("/auth/verify", response_model=None)
+    def verify(payload: VerifyRequest) -> dict[str, Any] | JSONResponse:
         result = verify_token(payload.token, "agentflow")
         if not result.valid:
             return JSONResponse(status_code=401, content={"valid": False, "reason": result.reason})

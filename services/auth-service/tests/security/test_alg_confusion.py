@@ -5,10 +5,9 @@ import hashlib
 import hmac
 import json
 
-from cryptography.hazmat.primitives import serialization
-
 from auth.jwt import verify_token
 from auth.keys import get_active_private_key
+from cryptography.hazmat.primitives import serialization
 
 
 def _b64url(value: bytes) -> str:

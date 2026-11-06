@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import jwt
@@ -54,7 +54,7 @@ class AuthServiceClient:
     def fetch_jwks(self) -> list[dict[str, Any]]:
         if self.http_client is not None:
             jwks = self._request_json("get", "/auth/.well-known/jwks.json")
-            return jwks.get("keys", [])
+            return cast(list[dict[str, Any]], jwks.get("keys", []))
 
         now = time.time()
         if self._jwks_cache is None or now >= self._jwks_cache_expires_at:
@@ -102,7 +102,7 @@ def verify_token(token: str, expected_audience: str = "agentflow") -> dict[str, 
         )
         payload = jwt.decode(
             token,
-            key=public_key,
+            key=public_key,  # type: ignore[arg-type]  # from_jwk returns public for a JWKS key
             algorithms=["RS256"],
             audience=expected_audience,
             issuer=settings.issuer,

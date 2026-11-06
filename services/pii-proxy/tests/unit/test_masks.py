@@ -1,7 +1,5 @@
 from fastapi.testclient import TestClient
-
 from pii_proxy.api import make_app
-
 
 client = TestClient(make_app())
 

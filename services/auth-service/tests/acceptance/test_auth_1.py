@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import base64
 from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
-
 from auth.api import make_app
 from auth.deps import require_auth
 from auth.keys import get_active_private_key, get_public_jwk_set
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
 
 client = TestClient(make_app())
 
@@ -132,7 +132,7 @@ def test_expired_token_rejected_by_protected_dependency() -> None:
     app = FastAPI()
 
     @app.get("/protected-dependency")
-    def protected(_: dict = Depends(require_auth())) -> dict[str, bool]:
+    def protected(_: Annotated[dict[str, Any], Depends(require_auth())]) -> dict[str, bool]:
         return {"ok": True}
 
     private_key = get_active_private_key()
