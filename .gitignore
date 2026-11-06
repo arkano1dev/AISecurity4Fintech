@@ -28,3 +28,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Private planning (not meant to be public)
+PRD.md

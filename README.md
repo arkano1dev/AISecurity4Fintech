@@ -92,10 +92,13 @@ This project is intentionally aligned with enterprise control needs:
 
 ## Local development
 
+See `CONTRIBUTING.md` for full setup and workflow.
+
 ```bash
-make test
-make lint
-make ci
+make up      # start Postgres + pgvector, Redis, Jaeger
+make test    # run tests with coverage
+make lint    # ruff + mypy --strict
+make ci      # test + lint + API contract check
 ```
 
 ## Operating principles
