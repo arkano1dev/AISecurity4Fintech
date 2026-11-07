@@ -16,6 +16,7 @@ dev = [
   "ruff>=0.7",
   "mypy>=1.11",
   "types-PyYAML>=6.0",
+  "uvicorn>=0.30",
 ]
 
 [tool.uv.workspace]
@@ -24,6 +25,7 @@ members = [
   "services/pii-proxy",
   "services/auth-service",
   "apps/agentflow",
+  "apps/vaultrag",
   "packages/py-shared",
 ]
 
