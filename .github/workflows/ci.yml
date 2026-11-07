@@ -15,7 +15,7 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv venv
-      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e apps/vaultrag -e packages/py-shared
       - run: uv pip install pytest pytest-cov pytest-asyncio hypothesis
       - run: uv run pytest -q --cov=services --cov=apps --cov=packages --cov-report=term-missing --cov-fail-under=80
 
@@ -28,7 +28,7 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv venv
-      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e apps/vaultrag -e packages/py-shared
       - run: uv pip install ruff mypy types-PyYAML
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -47,7 +47,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv python install 3.12
       - run: uv venv
-      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e apps/vaultrag -e packages/py-shared
       - run: uv pip install pip-audit
       - run: uv run pip-audit
 
@@ -60,5 +60,5 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv venv
-      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e apps/vaultrag -e packages/py-shared
       - run: uv run python scripts/check_contract.py

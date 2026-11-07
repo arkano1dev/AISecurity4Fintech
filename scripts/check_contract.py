@@ -12,12 +12,14 @@ from agentflow.api import make_app as agentflow_app
 from audit_log.api import make_app as audit_app
 from auth.api import make_app as auth_app
 from pii_proxy.api import make_app as pii_app
+from vaultrag.api import make_app as vaultrag_app
 
 EXPECTED: dict[str, list[str]] = {
     "audit": ["/audit/append", "/audit/verify"],
     "auth": ["/auth/token", "/auth/verify", "/auth/.well-known/jwks.json"],
     "pii": ["/pii/mask", "/pii/vault", "/pii/receipt/{receipt}"],
     "agentflow": ["/chat/session", "/chat/whoami", "/chat/account", "/chat/send"],
+    "vaultrag": ["/vaultrag/documents", "/vaultrag/query"],
 }
 
 
@@ -27,6 +29,7 @@ def main() -> None:
         "auth": auth_app(),
         "pii": pii_app(),
         "agentflow": agentflow_app(),
+        "vaultrag": vaultrag_app(),
     }
     failed = False
     for name, app in apps.items():
