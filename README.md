@@ -102,6 +102,9 @@ flowchart LR
 3. **Agents have bounded authority.** Identity is a short-lived, scoped RS256
    JWT; an LLM-driven agent can only *select* from a fixed tool allowlist, never
    parameterise it, and every dispatch is recorded.
+4. **Outputs are guarded.** Every generated answer passes a deterministic
+   deny-list that blocks system-prompt leaks and jailbreak canaries; a blocked
+   output becomes a refusal and is audited.
 
 No compliance claim ships without a test that proves it.
 
@@ -119,8 +122,9 @@ require scoped JWTs (`vaultrag:ingest` / `vaultrag:query`). See
 A multi-agent assistant driven by an LLM loop. The model classifies each request
 and selects a tool (`retrieve` / `freeze_card` / `check_balance`); the tool
 executes sub-keyed and audited; the model re-reasons with the result until it
-produces a final answer — with a deterministic keyword fallback if the model is
-down. See `apps/agentflow/README.md`.
+produces a final answer. A repeated tool call is refused explicitly (never loops
+to the cap), a deterministic output guardrail blocks leaks/canaries, and a
+keyword fallback covers model outages. See `apps/agentflow/README.md`.
 
 ## Shared services
 
