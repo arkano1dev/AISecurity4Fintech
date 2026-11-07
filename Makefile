@@ -1,4 +1,4 @@
-.PHONY: test lint format contract ci up down
+.PHONY: test lint format contract ci up down demo
 
 # Local commands aligned with the CI jobs (.github/workflows/ci.yml).
 # Dependencies are installed with uv — see CONTRIBUTING.md.
@@ -24,3 +24,6 @@ up:
 
 down:
 	docker compose -f infra/docker-compose/docker-compose.dev.yml down
+
+demo:
+	uv run python scripts/demo_vaultrag.py
