@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 import hashlib
 from collections.abc import Callable
+from typing import Annotated, Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from vaultrag.auth import TokenVerifier, require_auth
 from vaultrag.chunker import chunk_text
 from vaultrag.clients import AuditClient, Auditor, Masker, PiiClient
 from vaultrag.embeddings import embed_texts
@@ -60,12 +60,13 @@ def make_app(
     audit_client: Auditor | None = None,
     embed_fn: EmbedFn | None = None,
     llm_fn: LlmFn | None = None,
+    verify_token_fn: TokenVerifier | None = None,
 ) -> FastAPI:
     """Build the VaultRAG app with injectable dependencies for testing.
 
     The flow is: chunk -> mask PII -> embed -> store on ingest; embed -> retrieve
-    -> generate -> audit on query. Every dependency is swappable so the security
-    invariants can be tested without a running model.
+    -> generate -> audit on query. Ingest requires the ``vaultrag:ingest`` scope,
+    query requires ``vaultrag:query``; both are enforced on a verified JWT.
     """
     app = FastAPI(title="VaultRAG")
     store_obj = store if store is not None else VectorStore()
@@ -75,7 +76,13 @@ def make_app(
     generate = llm_fn if llm_fn is not None else _default_llm
 
     @app.post("/vaultrag/documents", response_model=IngestResponse, status_code=201)
-    def ingest(payload: DocumentRequest) -> IngestResponse:
+    def ingest(
+        payload: DocumentRequest,
+        _auth: Annotated[
+            dict[str, Any],
+            Depends(require_auth(["vaultrag:ingest"], verify_token_fn)),
+        ],
+    ) -> IngestResponse:
         chunks = chunk_text(payload.content, settings.chunk_size, settings.chunk_overlap)
         redacted = [pii.mask(chunk) for chunk in chunks]
         embeddings = embed(redacted)
@@ -93,7 +100,13 @@ def make_app(
         return IngestResponse(doc_id=payload.doc_id, chunks=len(chunks))
 
     @app.post("/vaultrag/query", response_model=QueryResponse)
-    def query(payload: QueryRequest) -> QueryResponse:
+    def query(
+        payload: QueryRequest,
+        _auth: Annotated[
+            dict[str, Any],
+            Depends(require_auth(["vaultrag:query"], verify_token_fn)),
+        ],
+    ) -> QueryResponse:
         if not store_obj.chunks():
             raise HTTPException(status_code=409, detail="no documents indexed")
         masked_question = pii.mask(payload.question)

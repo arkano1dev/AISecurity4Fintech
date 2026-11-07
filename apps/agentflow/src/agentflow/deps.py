@@ -30,6 +30,6 @@ def require_auth(required_scopes: list[str] | None = None) -> Callable[..., dict
         if required_scopes and set(required_scopes) - set(scopes):
             raise HTTPException(status_code=403, detail="insufficient_scope")
 
-        return {"sub": result.get("sub"), "scopes": scopes}
+        return {"sub": result.get("sub"), "scopes": scopes, "token": credentials.credentials}
 
     return dependency

@@ -6,3 +6,4 @@
 - [x] PII-1 shared PII proxy
 - [x] V1/V2 VaultRAG secure retrieval (ingest + query + redaction + audit)
 - [x] A1/A2 AgentFlow supervisor + scoped agents + audited freeze_card
+- [x] A4 AgentFlow → VaultRAG delegation + check_balance + sub-keyed isolation
