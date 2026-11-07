@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi.testclient import TestClient
-
 from auth import keys
 from auth.api import make_app
 from auth.jwt import issue_token, verify_token
 from auth.keys import KeyHandle, get_active_private_key, get_public_jwk_set, register_key
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi.testclient import TestClient
 
 
 def test_full_flow_issue_then_verify_against_real_keypair() -> None:
     client = TestClient(make_app())
-    issued = client.post(
-        "/auth/token", json={"username": "alice", "password": "correct-horse"}
-    )
+    issued = client.post("/auth/token", json={"username": "alice", "password": "correct-horse"})
     assert issued.status_code == 200
     result = client.post("/auth/verify", json={"token": issued.json()["access_token"]})
     assert result.status_code == 200
@@ -33,7 +32,7 @@ def test_jwks_matches_signing_key_by_kid() -> None:
 
 
 def test_rotation_adds_new_kid_and_old_still_verifies_in_grace(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(keys, "KEY_DIR", tmp_path)
     monkeypatch.setattr(keys, "REGISTRY_DIR", tmp_path / "registry")

@@ -6,27 +6,33 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m pip install --upgrade pip ruff mypy
-      - run: ruff check .
-      - run: ruff format --check .
-      - run: mypy --strict .
-
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
-      - run: python -m pip install --upgrade pip pytest pytest-cov
-      - run: pytest services/audit-log -q --cov=services/audit-log/src --cov-fail-under=0
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv venv
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install pytest pytest-cov pytest-asyncio hypothesis
+      - run: uv run pytest -q --cov=services --cov=apps --cov=packages --cov-report=term-missing --cov-fail-under=80
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv venv
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install ruff mypy types-PyYAML
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy --strict .
 
   secrets:
     runs-on: ubuntu-latest
@@ -34,27 +40,25 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker run --rm -v "$PWD:/src" zricethezav/gitleaks:v8.18.4 detect --source /src --no-banner --redact --config /src/.gitleaks.toml
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv venv
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv pip install pip-audit
+      - run: uv run pip-audit
+
   contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
-      - run: python - <<'PY'
-          import pathlib
-          root = pathlib.Path('.')
-          assert (root / 'services' / 'audit-log' / 'src' / 'audit_log').exists()
-          print('contract validation stub ok')
-        PY
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "red-team suite not wired yet (W5)"
-
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker compose -f infra/docker-compose/docker-compose.dev.yml config >/dev/null
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv venv
+      - run: uv pip install -e services/audit-log -e services/pii-proxy -e services/auth-service -e apps/agentflow -e packages/py-shared
+      - run: uv run python scripts/check_contract.py

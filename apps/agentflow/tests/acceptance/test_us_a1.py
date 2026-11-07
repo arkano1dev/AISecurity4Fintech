@@ -3,11 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from fastapi.testclient import TestClient
-
 from agentflow.api import make_app
 from auth.api import make_app as make_auth_app
 from auth.keys import get_active_private_key
+from fastapi.testclient import TestClient
 
 
 def _new_token(*, scopes: list[str], exp_delta: timedelta, audience: str = "agentflow") -> str:
@@ -28,7 +27,9 @@ def _new_token(*, scopes: list[str], exp_delta: timedelta, audience: str = "agen
 
 def test_valid_login_returns_session_token() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     response = agentflow_client.post(
         "/chat/session",
@@ -44,7 +45,9 @@ def test_valid_login_returns_session_token() -> None:
 
 def test_expired_token_rejected() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     token = _new_token(scopes=["chat:send", "account:read"], exp_delta=timedelta(minutes=-5))
     response = agentflow_client.get(
@@ -58,7 +61,9 @@ def test_expired_token_rejected() -> None:
 
 def test_tampered_token_rejected() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     valid = _new_token(scopes=["chat:send", "account:read"], exp_delta=timedelta(minutes=5))
     parts = valid.split(".")
@@ -74,7 +79,9 @@ def test_tampered_token_rejected() -> None:
 
 def test_wrong_scope_rejected() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     token = _new_token(scopes=["chat:send"], exp_delta=timedelta(minutes=5))
     response = agentflow_client.get(
@@ -88,7 +95,9 @@ def test_wrong_scope_rejected() -> None:
 
 def test_valid_scope_accepted() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     token = _new_token(scopes=["chat:send", "account:read"], exp_delta=timedelta(minutes=5))
     response = agentflow_client.get(
@@ -102,7 +111,9 @@ def test_valid_scope_accepted() -> None:
 
 def test_self_signed_token_rejected() -> None:
     auth_client = TestClient(make_auth_app())
-    agentflow_client = TestClient(make_app(auth_service_url="http://testserver", auth_service_client=auth_client))
+    agentflow_client = TestClient(
+        make_app(auth_service_url="http://testserver", auth_service_client=auth_client)
+    )
 
     other_key = get_active_private_key()
     token = jwt.encode(
@@ -126,4 +137,8 @@ def test_self_signed_token_rejected() -> None:
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] in {"invalid_signature", "invalid_audience", "invalid_algorithm"}
+    assert response.json()["detail"] in {
+        "invalid_signature",
+        "invalid_audience",
+        "invalid_algorithm",
+    }

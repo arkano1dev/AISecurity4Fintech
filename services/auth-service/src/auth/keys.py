@@ -68,6 +68,8 @@ def load_private_key() -> KeyHandle:
         generate_rsa_keypair()
     key_bytes = settings.auth_private_key_path.read_bytes()
     private_key = serialization.load_pem_private_key(key_bytes, password=None)
+    if not isinstance(private_key, rsa.RSAPrivateKey):
+        raise ValueError("configured key is not an RSA private key")
     kid_path = settings.auth_private_key_path.with_suffix(".kid")
     if not kid_path.exists():
         kid_path.write_text(str(uuid.uuid4()), encoding="ascii")
@@ -88,6 +90,8 @@ def get_active_private_key() -> KeyHandle:
         private_key = serialization.load_pem_private_key(
             private_key_path.read_bytes(), password=None
         )
+        if not isinstance(private_key, rsa.RSAPrivateKey):
+            raise ValueError(f"registered key {private_key_path.stem} is not RSA")
         _key_registry.setdefault(
             private_key_path.stem,
             KeyHandle(private_key, key_id=private_key_path.stem),

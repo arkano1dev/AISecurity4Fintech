@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,4 +26,4 @@ def load_users() -> dict[str, dict[str, object]]:
     if not settings.auth_user_file.exists():
         return {}
     data = yaml.safe_load(settings.auth_user_file.read_text(encoding="utf-8")) or {}
-    return data.get("users", {})
+    return cast(dict[str, dict[str, object]], data.get("users", {}))

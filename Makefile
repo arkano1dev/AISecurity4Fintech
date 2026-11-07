@@ -1,23 +1,26 @@
-.PHONY: test lint format ci
+.PHONY: test lint format contract ci up down
 
-PYTHON ?= python3
-PYTEST ?= $(PYTHON) -m pytest
-RUFF ?= $(PYTHON) -m ruff
-MYPY ?= $(PYTHON) -m mypy
+# Local commands aligned with the CI jobs (.github/workflows/ci.yml).
+# Dependencies are installed with uv — see CONTRIBUTING.md.
 
-# Local commands aligned with CI jobs and the uv workspace layout.
 test:
-	$(PYTEST) services/audit-log -q --cov=services/audit-log/src --cov-fail-under=0
+	uv run pytest -q --cov=services --cov=apps --cov=packages --cov-fail-under=80
 
 lint:
-	$(RUFF) check .
-	$(RUFF) format --check .
-	$(MYPY) --strict .
+	uv run ruff check .
+	uv run ruff format --check .
+	uv run mypy --strict .
 
 format:
-	$(RUFF) format .
+	uv run ruff format .
 
-ci: lint test
-	python -c "import pathlib; root = pathlib.Path('.').resolve(); assert (root / 'services' / 'audit-log' / 'src' / 'audit_log').exists(); print('contract stub ok')"
-	gitleaks detect --no-banner --redact --config .gitleaks.toml || true
-	echo "red-team suite not wired yet (W5)"
+contract:
+	uv run python scripts/check_contract.py
+
+ci: test lint contract
+
+up:
+	docker compose -f infra/docker-compose/docker-compose.dev.yml up -d
+
+down:
+	docker compose -f infra/docker-compose/docker-compose.dev.yml down

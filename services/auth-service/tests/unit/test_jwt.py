@@ -53,7 +53,7 @@ def test_verify_rejects_none_alg() -> None:
             "exp": 9999999999,
             "jti": "none-1",
         },
-        key=None,
+        key=None,  # type: ignore[arg-type]  # unsecured "none" token needs no key
         algorithm="none",
     )
     result = verify_token(token, "agentflow")
