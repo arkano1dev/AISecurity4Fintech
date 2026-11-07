@@ -47,6 +47,7 @@ flowchart LR
     AF --> PII
     VR --> AL[audit-log]
     AF --> AL
+    AF --> VR
     VR --> LLM[Ollama]
     PII --> LLM
     AF --> AUTH[auth-service]
@@ -54,6 +55,18 @@ flowchart LR
 ```
 
 `pii-proxy` is the only path to the model. Nothing crosses it unmasked.
+
+## LLM runtime (Ollama)
+
+The model runs through [Ollama](https://ollama.com), a local inference runtime:
+
+- **Embeddings** — `nomic-embed-text`, a local model that turns text into vectors.
+- **Generation** — `deepseek-v4-pro:cloud`, a cloud-hosted model that writes answers.
+
+Ollama must be running for `make demo` (retrieval embedding and generation both
+call it). The model is configurable via `OLLAMA_URL` and the `*_LLM_MODEL` /
+`*_EMBED_MODEL` settings, so it can point at any Ollama without code changes.
+No PII ever reaches it: `pii-proxy` masks every text first.
 
 ## Applications
 
@@ -102,7 +115,7 @@ infra/
 ```bash
 make up      # start Postgres + pgvector, Redis, Jaeger
 make test    # full suite with coverage
-make demo    # end-to-end VaultRAG demo (needs Ollama running)
+make demo    # integrated VaultRAG + AgentFlow demo (needs Ollama running)
 make ci      # test + lint + type-check + contract check
 ```
 
@@ -116,7 +129,7 @@ Setup needs Python 3.12 and `uv` — see `CONTRIBUTING.md`.
 | `auth-service` | ✅ RS256 + JWKS |
 | `pii-proxy` | ✅ masking + AES-GCM vault (in-memory) |
 | `vaultrag` | ✅ ingest + query + redaction + audit (in-memory store) |
-| `agentflow` | ⚠️ session + scoped JWT only (no agents yet) |
+| `agentflow` | ✅ supervisor + scoped agents + VaultRAG delegation (in-memory) |
 
 Postgres/pgvector persistence is the next layer: prove the pipeline first, then
 persist it.

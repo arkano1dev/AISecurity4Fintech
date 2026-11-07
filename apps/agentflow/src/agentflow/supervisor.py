@@ -11,7 +11,17 @@ class Intent(StrEnum):
     ACTION = "action"
 
 
-ACTION_KEYWORDS = ("freeze", "block", "dispute", "fraud", "unauthorized", "stolen", "suspend")
+ACTION_KEYWORDS = (
+    "freeze",
+    "block",
+    "dispute",
+    "fraud",
+    "unauthorized",
+    "stolen",
+    "suspend",
+    "balance",
+    "funds",
+)
 
 
 def classify(message: str) -> Intent:
@@ -36,22 +46,30 @@ class Supervisor:
     """Classifies a message and dispatches it to the agent with bounded authority.
 
     Each agent declares ``required_scopes``; a dispatch is rejected if the
-    caller's token does not carry them.
+    caller's token does not carry them. The caller's ``sub`` and bearer token are
+    passed through so agents can act on the authenticated identity.
     """
 
     def __init__(
         self,
-        retrieval_agent: RetrievalAgent | None = None,
-        action_agent: ActionAgent | None = None,
+        retrieval_agent: RetrievalAgent,
+        action_agent: ActionAgent,
     ) -> None:
-        self._retrieval = retrieval_agent or RetrievalAgent()
-        self._action = action_agent or ActionAgent()
+        self._retrieval = retrieval_agent
+        self._action = action_agent
 
-    def dispatch(self, message: str, scopes: list[str]) -> dict[str, Any]:
+    def dispatch(
+        self,
+        message: str,
+        *,
+        actor_sub: str,
+        scopes: list[str],
+        token: str,
+    ) -> dict[str, Any]:
         intent = classify(message)
         agent = self._action if intent is Intent.ACTION else self._retrieval
         self._enforce_scope(scopes, agent.required_scopes)
-        result = agent.run(message)
+        result = agent.run(message, actor_sub, token)
         return {"intent": intent.value, "agent": agent.name, "result": result}
 
     @staticmethod

@@ -4,6 +4,7 @@ users:
     scopes:
       - chat:send
       - account:read
+      - agent:action
   bob:
     password: correct-horse-2
     scopes:
@@ -14,3 +15,8 @@ users:
       - chat:send
       - agent:retrieve
       - agent:action
+      - vaultrag:query
+  loader:
+    password: loader-pass
+    scopes:
+      - vaultrag:ingest

@@ -21,6 +21,9 @@ class VaultragSettings(BaseSettings):
     chunk_size: int = 500
     chunk_overlap: int = 50
     top_k: int = 4
+    auth_service_url: str = "http://localhost:8000"
+    audience: str = "agentflow"
+    issuer: str = "auth"
 
 
 settings = VaultragSettings()

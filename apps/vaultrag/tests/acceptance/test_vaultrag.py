@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from vaultrag.api import make_app
 from vaultrag.store import VectorStore
 
+_AUTH = {"Authorization": "Bearer test-token"}
+
 
 class FakeMasker:
     """In-process stand-in for the pii-proxy: replaces a fixed set of values."""
@@ -43,6 +45,10 @@ def _generate(question: str, context: list[str]) -> str:
     return "The answer is grounded in the retrieved context."
 
 
+def _fake_verify(_token: str) -> dict[str, Any]:
+    return {"valid": True, "sub": "analyst", "scopes": ["vaultrag:ingest", "vaultrag:query"]}
+
+
 def _client(
     masker: FakeMasker | None = None,
     auditor: FakeAuditor | None = None,
@@ -64,6 +70,7 @@ def _client(
         audit_client=audit,
         embed_fn=_embed,
         llm_fn=capturing_generate,
+        verify_token_fn=_fake_verify,
     )
     return TestClient(app), store, pii, audit, seen_question, seen_context
 
@@ -77,6 +84,7 @@ def test_ingest_redacts_pii_before_embedding() -> None:
     response = client.post(
         "/vaultrag/documents",
         json={"doc_id": "doc-1", "title": "AML procedure", "content": content},
+        headers=_AUTH,
     )
     assert response.status_code == 201
     assert response.json()["chunks"] >= 1
@@ -95,8 +103,13 @@ def test_query_returns_answer_and_citations() -> None:
             "title": "AML procedure",
             "content": "Wire transfers above ten thousand require manager approval.",
         },
+        headers=_AUTH,
     )
-    response = client.post("/vaultrag/query", json={"question": "wire transfer threshold?"})
+    response = client.post(
+        "/vaultrag/query",
+        json={"question": "wire transfer threshold?"},
+        headers=_AUTH,
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["answer"]
@@ -112,10 +125,12 @@ def test_query_masks_pii_before_model_and_writes_audit() -> None:
             "title": "AML procedure",
             "content": "Escalate account DE89370400440532013000 to the compliance officer.",
         },
+        headers=_AUTH,
     )
     response = client.post(
         "/vaultrag/query",
         json={"question": "what happens to account DE89370400440532013000?"},
+        headers=_AUTH,
     )
     assert response.status_code == 200
 

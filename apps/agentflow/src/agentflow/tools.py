@@ -1,19 +1,29 @@
 from __future__ import annotations
 
+from typing import Any
 
-class FreezeCardTool:
-    """The single bounded action: freeze a card.
 
-    In-memory for now; the PRD defers persistence. The ``run`` interface is what a
-    real ledger-backed action will also implement.
+class AccountService:
+    """Sub-keyed in-memory account state: balances and frozen cards.
+
+    Every operation is keyed by the authenticated ``sub`` from the JWT, so a
+    caller can only touch their own account — never an attacker-chosen id.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, balances: dict[str, float] | None = None) -> None:
+        self._balances: dict[str, float] = dict(balances or {})
         self._frozen: set[str] = set()
 
-    def run(self, card_ref: str) -> dict[str, str]:
-        self._frozen.add(card_ref)
-        return {"tool": "freeze_card", "card_ref": card_ref, "status": "frozen"}
+    def check_balance(self, actor_sub: str) -> dict[str, Any]:
+        return {
+            "tool": "check_balance",
+            "account": actor_sub,
+            "balance": self._balances.get(actor_sub, 0.0),
+        }
 
-    def is_frozen(self, card_ref: str) -> bool:
-        return card_ref in self._frozen
+    def freeze_card(self, actor_sub: str) -> dict[str, Any]:
+        self._frozen.add(actor_sub)
+        return {"tool": "freeze_card", "account": actor_sub, "status": "frozen"}
+
+    def is_frozen(self, actor_sub: str) -> bool:
+        return actor_sub in self._frozen
