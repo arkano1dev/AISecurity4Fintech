@@ -6,11 +6,15 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
+from agentflow.agents import ActionAgent, RetrievalAgent
 from agentflow.audit_client import AuditClient, Auditor
 from agentflow.auth_client import AuthServiceClient, configure_auth_client
 from agentflow.deps import require_auth
+from agentflow.pii_client import Masker, PiiClient
 from agentflow.settings import settings
 from agentflow.supervisor import InsufficientScopeError, Supervisor
+from agentflow.tools import AccountService
+from agentflow.vaultrag_client import VaultragClient, VaultragQuerier, VaultragUnavailableError
 
 
 class SessionRequest(BaseModel):
@@ -30,6 +34,9 @@ def make_app(
     *,
     supervisor: Supervisor | None = None,
     audit_client: Auditor | None = None,
+    pii_client: Masker | None = None,
+    vaultrag_client: VaultragQuerier | None = None,
+    account_service: AccountService | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentFlow")
     configured_client = AuthServiceClient(
@@ -40,7 +47,13 @@ def make_app(
         base_url=auth_service_url or settings.auth_service_url,
         http_client=auth_service_client,
     )
-    supervisor_obj = supervisor or Supervisor()
+    pii = pii_client or PiiClient(settings.pii_proxy_url)
+    vaultrag = vaultrag_client or VaultragClient(settings.vaultrag_url)
+    account_svc = account_service or AccountService()
+    supervisor_obj = supervisor or Supervisor(
+        RetrievalAgent(pii, vaultrag),
+        ActionAgent(account_svc),
+    )
     audit = audit_client or AuditClient(settings.audit_log_url)
 
     @app.post("/chat/session", response_model=SessionResponse)
@@ -77,9 +90,16 @@ def make_app(
     ) -> dict[str, Any]:
         message = payload.get("message", "")
         try:
-            outcome = supervisor_obj.dispatch(message, details["scopes"])
+            outcome = supervisor_obj.dispatch(
+                message,
+                actor_sub=details["sub"],
+                scopes=details["scopes"],
+                token=details["token"],
+            )
         except InsufficientScopeError:
             raise HTTPException(status_code=403, detail="insufficient_scope") from None
+        except VaultragUnavailableError:
+            raise HTTPException(status_code=503, detail="vaultrag_unavailable") from None
 
         audit.append(
             actor_sub=details["sub"],
@@ -91,14 +111,16 @@ def make_app(
             },
         )
         if outcome["intent"] == "action":
+            action_payload = {
+                "tool": outcome["result"]["tool"],
+                "account": outcome["result"].get("account"),
+            }
+            if "status" in outcome["result"]:
+                action_payload["status"] = outcome["result"]["status"]
             audit.append(
                 actor_sub=details["sub"],
                 action="agentflow.action",
-                payload={
-                    "tool": outcome["result"]["tool"],
-                    "card_ref_hash": _sha256(str(outcome["result"]["card_ref"])),
-                    "status": outcome["result"]["status"],
-                },
+                payload=action_payload,
             )
         return {
             "sub": details["sub"],

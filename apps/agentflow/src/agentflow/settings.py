@@ -12,6 +12,8 @@ class AgentflowSettings(BaseSettings):
     audience: str = "agentflow"
     issuer: str = "auth"
     audit_log_url: str = "http://localhost:8101"
+    vaultrag_url: str = "http://localhost:8003"
+    pii_proxy_url: str = "http://localhost:8002"
 
 
 settings = AgentflowSettings()
