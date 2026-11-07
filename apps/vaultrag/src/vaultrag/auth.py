@@ -16,7 +16,7 @@ _bearer = HTTPBearer(auto_error=False)
 TokenVerifier = Callable[[str], dict[str, Any]]
 
 
-def verify_token(token: str) -> dict[str, Any]:
+def verify_token(token: str, *, http_client: httpx.Client | None = None) -> dict[str, Any]:
     """Verify an RS256 JWT against the shared auth-service JWKS.
 
     The consumer verifies locally against a fetched JWKS; the issuer holds the
@@ -26,7 +26,12 @@ def verify_token(token: str) -> dict[str, Any]:
         header = jwt.get_unverified_header(token)
         if header.get("alg") != "RS256":
             return {"valid": False, "reason": "invalid_algorithm"}
-        response = httpx.get(f"{settings.auth_service_url}/auth/.well-known/jwks.json", timeout=5.0)
+        if http_client is not None:
+            response = http_client.get("/auth/.well-known/jwks.json")
+        else:
+            response = httpx.get(
+                f"{settings.auth_service_url}/auth/.well-known/jwks.json", timeout=5.0
+            )
         response.raise_for_status()
         keys = response.json().get("keys", [])
         jwk_key = next((key for key in keys if key.get("kid") == header.get("kid")), None)
