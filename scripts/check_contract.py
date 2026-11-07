@@ -8,10 +8,10 @@ Run with: uv run python scripts/check_contract.py
 
 from __future__ import annotations
 
+from agentflow.api import make_app as agentflow_app
 from audit_log.api import make_app as audit_app
 from auth.api import make_app as auth_app
 from pii_proxy.api import make_app as pii_app
-from agentflow.api import make_app as agentflow_app
 
 EXPECTED: dict[str, list[str]] = {
     "audit": ["/audit/append", "/audit/verify"],
