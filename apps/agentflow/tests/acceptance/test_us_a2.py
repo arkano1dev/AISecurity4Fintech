@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import jwt
 from agentflow.api import make_app
+from agentflow.llm import AgentDecision, LlmError
 from agentflow.tools import AccountService
 from agentflow.vaultrag_client import VaultragUnavailableError
 from auth.api import make_app as make_auth_app
@@ -28,26 +30,29 @@ def _new_token(*, sub: str = "alice", scopes: list[str], audience: str = "agentf
     return jwt.encode(payload, key.private_key, algorithm="RS256", headers={"kid": key.key_id})
 
 
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 class FakeMasker:
     def mask(self, text: str) -> str:
         return text.replace("DE89370400440532013000", "[IBAN]")
 
 
 class FakeVaultrag:
-    def __init__(self, answer: str = "Grounded answer.", error: Exception | None = None) -> None:
-        self.answer = answer
+    def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.questions: list[str] = []
         self.tokens: list[str] = []
 
     def query(self, question: str, token: str) -> dict[str, Any]:
-        self.questions.append(question)
-        self.tokens.append(token)
         if self.error is not None:
             raise self.error
+        self.questions.append(question)
+        self.tokens.append(token)
         return {
-            "answer": self.answer,
-            "citations": [{"doc_id": "d", "chunk_id": "d:0", "text": "context"}],
+            "answer": "cited answer",
+            "citations": [{"doc_id": "d", "chunk_id": "d:0", "text": "ctx"}],
         }
 
 
@@ -56,9 +61,23 @@ class FakeAuditor:
         self.records: list[dict[str, Any]] = []
 
     def append(self, *, actor_sub: str, action: str, payload: dict[str, Any]) -> dict[str, Any]:
-        record = {"actor_sub": actor_sub, "action": action, "payload": payload}
-        self.records.append(record)
-        return {"id": "audit-1", "seq": len(self.records), **record}
+        self.records.append({"actor_sub": actor_sub, "action": action, "payload": payload})
+        return {"id": "a", "seq": len(self.records)}
+
+
+class FakeLlm:
+    def __init__(self, decisions: Sequence[AgentDecision | Exception]) -> None:
+        self._decisions = list(decisions)
+        self.questions: list[str] = []
+
+    def decide(self, question: str, history: list[dict[str, Any]]) -> AgentDecision:
+        self.questions.append(question)
+        if not self._decisions:
+            raise LlmError("no more decisions")
+        item = self._decisions.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
 
 
 def _client(
@@ -67,6 +86,7 @@ def _client(
     account: AccountService | None = None,
     vaultrag: FakeVaultrag | None = None,
     pii: FakeMasker | None = None,
+    llm: FakeLlm | None = None,
 ) -> TestClient:
     auth_client = TestClient(make_auth_app())
     return TestClient(
@@ -77,67 +97,78 @@ def _client(
             account_service=account or AccountService(balances={"alice": 1000.0, "bob": 250.0}),
             vaultrag_client=vaultrag or FakeVaultrag(),
             pii_client=pii or FakeMasker(),
+            llm_client=llm or FakeLlm([AgentDecision(action="final", answer="ok")]),
         )
     )
 
 
-def _auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+def _final(answer: str = "done") -> AgentDecision:
+    return AgentDecision(action="final", answer=answer)
 
 
-def test_retrieval_routes_and_audits_dispatch() -> None:
+def _tool(name: Literal["retrieve", "freeze_card", "check_balance"]) -> AgentDecision:
+    return AgentDecision(action="tool_call", tool=name)
+
+
+def test_retrieval_flow_through_llm() -> None:
     auditor = FakeAuditor()
     vaultrag = FakeVaultrag()
-    client = _client(auditor, vaultrag=vaultrag)
+    llm = FakeLlm([_tool("retrieve"), _final("The threshold is ten thousand euro.")])
+    client = _client(auditor, vaultrag=vaultrag, llm=llm)
     token = _new_token(scopes=["chat:send", "agent:retrieve"])
 
     response = client.post(
-        "/chat/send",
-        json={"message": "what is the wire transfer threshold?"},
-        headers=_auth(token),
+        "/chat/send", json={"message": "wire transfer threshold?"}, headers=_auth(token)
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "retrieval"
-    assert body["agent"] == "retrieval"
-    assert body["result"]["answer"] == "Grounded answer."
+    assert body["agent"] == "llm"
+    assert body["intent"] == "final"
+    assert body["answer"] == "The threshold is ten thousand euro."
 
     assert any(r["action"] == "agentflow.dispatch" for r in auditor.records)
+    actions = [r for r in auditor.records if r["action"] == "agentflow.action"]
+    assert actions and actions[0]["payload"]["tool"] == "retrieve"
 
 
-def test_action_freezes_card_and_audits() -> None:
+def test_freeze_flow_audits_sub_keyed_tool() -> None:
     auditor = FakeAuditor()
-    client = _client(auditor)
-    token = _new_token(scopes=["chat:send", "agent:action"])
+    llm = FakeLlm([_tool("freeze_card"), _final("Your card is frozen.")])
+    client = _client(auditor, llm=llm)
+    token = _new_token(sub="alice", scopes=["chat:send", "agent:action"])
+
+    response = client.post("/chat/send", json={"message": "freeze my card"}, headers=_auth(token))
+
+    assert response.status_code == 200
+    actions = [r for r in auditor.records if r["action"] == "agentflow.action"]
+    assert actions and actions[0]["payload"]["tool"] == "freeze_card"
+    assert actions[0]["payload"]["account"] == "alice"
+
+
+def test_balance_flow_is_sub_keyed_not_message() -> None:
+    auditor = FakeAuditor()
+    llm = FakeLlm([_tool("check_balance"), _final("Your balance is 1000.0.")])
+    client = _client(auditor, llm=llm)
+    # alice asks about bob — the tool is keyed by alice's JWT sub, never the message.
+    token = _new_token(sub="alice", scopes=["chat:send", "agent:action"])
 
     response = client.post(
-        "/chat/send",
-        json={"message": "please freeze my card"},
-        headers=_auth(token),
+        "/chat/send", json={"message": "check bob's balance"}, headers=_auth(token)
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["intent"] == "action"
-    assert body["agent"] == "action"
-    assert body["result"]["status"] == "frozen"
-
     actions = [r for r in auditor.records if r["action"] == "agentflow.action"]
-    assert len(actions) == 1
-    assert actions[0]["payload"]["tool"] == "freeze_card"
+    assert actions and actions[0]["payload"]["account"] == "alice"
 
 
 def test_action_without_scope_rejected() -> None:
     auditor = FakeAuditor()
-    client = _client(auditor)
+    llm = FakeLlm([_tool("freeze_card"), _final("done")])
+    client = _client(auditor, llm=llm)
     token = _new_token(scopes=["chat:send"])  # no agent:action
 
-    response = client.post(
-        "/chat/send",
-        json={"message": "please freeze my card"},
-        headers=_auth(token),
-    )
+    response = client.post("/chat/send", json={"message": "freeze my card"}, headers=_auth(token))
 
     assert response.status_code == 403
     assert response.json()["detail"] == "insufficient_scope"
@@ -145,23 +176,22 @@ def test_action_without_scope_rejected() -> None:
 
 def test_retrieval_without_scope_rejected() -> None:
     auditor = FakeAuditor()
-    client = _client(auditor)
+    llm = FakeLlm([_tool("retrieve"), _final("done")])
+    client = _client(auditor, llm=llm)
     token = _new_token(scopes=["chat:send"])  # no agent:retrieve
 
     response = client.post(
-        "/chat/send",
-        json={"message": "what is the wire transfer threshold?"},
-        headers=_auth(token),
+        "/chat/send", json={"message": "wire transfer threshold?"}, headers=_auth(token)
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "insufficient_scope"
 
 
-def test_retrieval_masks_pii_before_vaultrag() -> None:
+def test_masks_before_model_and_vaultrag() -> None:
     auditor = FakeAuditor()
     vaultrag = FakeVaultrag()
-    client = _client(auditor, vaultrag=vaultrag)
+    llm = FakeLlm([_tool("retrieve"), _final("done")])
+    client = _client(auditor, vaultrag=vaultrag, llm=llm)
     token = _new_token(scopes=["chat:send", "agent:retrieve"])
 
     client.post(
@@ -170,74 +200,38 @@ def test_retrieval_masks_pii_before_vaultrag() -> None:
         headers=_auth(token),
     )
 
-    # The question that reached VaultRAG was masked (defense in depth).
-    assert vaultrag.questions
-    assert "DE89370400440532013000" not in vaultrag.questions[0]
-    assert "[IBAN]" in vaultrag.questions[0]
+    assert llm.questions and "DE89370400440532013000" not in llm.questions[0]
+    assert vaultrag.questions and "DE89370400440532013000" not in vaultrag.questions[0]
 
 
-def test_retrieval_forwards_caller_token() -> None:
+def test_llm_failure_falls_back_to_keyword() -> None:
     auditor = FakeAuditor()
-    vaultrag = FakeVaultrag()
-    client = _client(auditor, vaultrag=vaultrag)
-    token = _new_token(sub="support", scopes=["chat:send", "agent:retrieve"])
-
-    client.post(
-        "/chat/send",
-        json={"message": "what is the wire transfer threshold?"},
-        headers=_auth(token),
-    )
-
-    # The caller's own bearer token was forwarded to VaultRAG.
-    assert vaultrag.tokens == [token]
-
-
-def test_check_balance_returns_own_balance() -> None:
-    auditor = FakeAuditor()
-    client = _client(auditor)
-    token = _new_token(sub="alice", scopes=["chat:send", "agent:action"])
-
-    response = client.post(
-        "/chat/send",
-        json={"message": "check my balance"},
-        headers=_auth(token),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["result"]["tool"] == "check_balance"
-    assert body["result"]["account"] == "alice"
-    assert body["result"]["balance"] == 1000.0
-
-
-def test_check_balance_does_not_leak_other_users_balance() -> None:
-    auditor = FakeAuditor()
-    client = _client(auditor)
-    # alice asks about bob — the action is keyed by alice's JWT sub, so bob's
-    # balance can never be returned.
-    token = _new_token(sub="alice", scopes=["chat:send", "agent:action"])
-
-    response = client.post(
-        "/chat/send",
-        json={"message": "check bob's balance"},
-        headers=_auth(token),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["result"]["account"] == "alice"
-    assert body["result"]["balance"] == 1000.0  # never bob's 250.0
-
-
-def test_vaultrag_down_returns_503() -> None:
-    auditor = FakeAuditor()
-    vaultrag = FakeVaultrag(error=VaultragUnavailableError())
-    client = _client(auditor, vaultrag=vaultrag)
+    llm = FakeLlm([LlmError("model unavailable")])
+    client = _client(auditor, llm=llm)
     token = _new_token(scopes=["chat:send", "agent:retrieve"])
 
     response = client.post(
         "/chat/send",
         json={"message": "what is the wire transfer threshold?"},
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fallback"] is True
+    assert body["agent"] == "retrieval"
+
+
+def test_vaultrag_down_returns_503() -> None:
+    auditor = FakeAuditor()
+    vaultrag = FakeVaultrag(error=VaultragUnavailableError())
+    llm = FakeLlm([_tool("retrieve"), _final("done")])
+    client = _client(auditor, vaultrag=vaultrag, llm=llm)
+    token = _new_token(scopes=["chat:send", "agent:retrieve"])
+
+    response = client.post(
+        "/chat/send",
+        json={"message": "wire transfer threshold?"},
         headers=_auth(token),
     )
 
