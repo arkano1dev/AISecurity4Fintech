@@ -43,8 +43,7 @@ def test_mask_endpoint_redacts_iban_pan_phone() -> None:
         "/pii/mask",
         json={
             "text": (
-                "IBAN DE89370400440532013000, card 4111 1111 1111 1111, "
-                "call +49 170 123 4567."
+                "IBAN DE89370400440532013000, card 4111 1111 1111 1111, call +49 170 123 4567."
             ),
         },
     )
