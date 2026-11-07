@@ -36,6 +36,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["agentflow", "audit_log", "auth", "pii_proxy", "shared", "vaultrag"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
