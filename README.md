@@ -1,112 +1,135 @@
-# Fintech AI Platform
+# AISecurity4Fintech
 
-This repository is a production-oriented reference implementation for secure AI systems in regulated financial environments. It is designed for organizations that need to deploy AI-powered workflows for compliance, support, and operations without giving up governance, traceability, or data protection.
+A reference platform for running AI over sensitive documents and customer
+interactions **without** leaking personal data, losing control of what the model
+does, or losing evidence of what happened.
 
-## Why this project exists
+Two applications share one security layer:
 
-Financial institutions are adopting AI for knowledge work, customer support, and internal operations, but the risk profile is higher than in standard SaaS environments. The core problem is not whether the model can answer a question; it is whether the system can do so safely, transparently, and in a way that can be defended under audit.
+- **VaultRAG** — secure retrieval with citations, for compliance and AML analysts.
+- **AgentFlow** — a multi-agent assistant for customer support and operations.
 
-In regulated fintech environments, teams need to address the following problems at the same time:
+Both sit behind the same primitives: scoped JWTs, a PII proxy, and a
+tamper-evident audit log.
 
-- unauthorized exposure of customer or employee data to LLMs
-- invisible or untraceable AI decisions during support and compliance tasks
-- prompt injection or tool misuse from untrusted data sources
-- weak evidence of what happened when a workflow executed
-- poor alignment with governance requirements such as GDPR, PSD2, DORA, and the EU AI Act
+## The problem
 
-This project is built to answer those concerns with a clear technical foundation instead of a model-only prototype.
+An LLM answers from what it was trained on. In a regulated setting that is not
+enough:
 
-## Product value
+- The model can be wrong and cannot point at the source of a claim.
+- It must never see raw customer data.
+- Every action it takes must be provable later.
 
-The platform is organized around two primary business-facing experiences:
+This platform solves those three problems with concrete, tested controls — not
+with model-only glue.
 
-- VaultRAG for compliance analysts and risk teams who need secure retrieval over policy, process, and investigation content
-- AgentFlow for customer support and operations teams that need structured multi-agent workflows with controlled tool use
+## The security invariants
 
-Both applications rely on a shared security primitive: an append-only, tamper-evident audit log that records sensitive actions in a way that can be independently verified.
+Everything in this repository exists to uphold three rules:
 
-## How the platform solves the problem
+1. **No raw PII reaches the model.** Every text is masked by `pii-proxy` before
+   it is embedded or sent to the model.
+2. **Every sensitive action is audited.** `audit-log` records it in an
+   append-only SHA-256 hash chain that detects tampering.
+3. **Agents have bounded authority.** Identity is a short-lived, scoped RS256
+   JWT; no agent holds more scope than its task requires.
 
-The project takes a control-oriented approach to AI in finance:
+No compliance claim ships without a test that proves it.
 
-1. Secure retrieval
-   - documents and policy knowledge are retrieved under access-aware boundaries
-   - usage stays aligned with internal compliance and investigation workflows
+## Architecture
 
-2. Controlled orchestration
-   - multi-agent actions are supervised and scoped to explicit operational responsibilities
-   - tool execution is treated as a governed capability, not a free-form agent action
+```mermaid
+flowchart LR
+    U[User] --> VR[VaultRAG]
+    U --> AF[AgentFlow]
+    VR --> PII[pii-proxy]
+    AF --> PII
+    VR --> AL[audit-log]
+    AF --> AL
+    VR --> LLM[Ollama]
+    PII --> LLM
+    AF --> AUTH[auth-service]
+    AUTH --> JWKS[JWKS]
+```
 
-3. Tamper-evident auditing
-   - every significant action is recorded as an append-only hash-linked event
-   - the chain can be verified to detect modification or deletion attempts
+`pii-proxy` is the only path to the model. Nothing crosses it unmasked.
 
-4. Operational transparency
-   - logs, structured settings, and tracing are built around shared platform primitives
-   - the design supports later integration with stronger security controls such as service mTLS, KMS-backed secrets, and external verification anchors
+## Applications
 
-## What type of solution this is
+### VaultRAG
 
-This is a reference architecture for secure AI in regulated enterprise settings. It combines:
+Secure retrieval-augmented generation over internal documents. Ingest a
+document, ask a question, get an answer with citations — with PII redacted
+before it ever reaches the model. See `apps/vaultrag/README.md`.
 
-- FastAPI services for API-based workflow access
-- Pydantic v2 for typed runtime validation
-- SQLAlchemy and Postgres for durable persistence
-- a hash-chain audit model for integrity proof
-- a monorepo workspace structure for shared security primitives
+### AgentFlow
 
-It is not a generic toy app. It is a platform blueprint for teams that need to operationalize AI in environments where auditability, data controls, and governance are business-critical.
+A multi-agent assistant for customer support. A supervisor classifies each
+request and routes it to a specialized agent with a scoped JWT. See
+`apps/agentflow/README.md`.
 
-## Business applicability
+## Shared services
 
-This architecture can be adapted to several regulated or high-trust sectors beyond fintech:
+| Service | What it does |
+| --- | --- |
+| `auth-service` | Issues short-lived, scoped RS256 JWTs; exposes JWKS |
+| `pii-proxy` | Masks PII; stores the reversible mapping in an AES-GCM vault |
+| `audit-log` | Append-only, hash-linked, tamper-evident record of actions |
 
-- banks and payment providers
-- insurers and claims operations
-- wealth and asset management firms
-- lending and underwriting platforms
-- B2B fintech platforms with compliance-heavy workflows
-- internal enterprise knowledge systems handling sensitive operational records
+## Repository layout
 
-The same design pattern applies wherever AI supports human decision-making but must preserve evidence, limit data exposure, and provide reviewer confidence.
+```
+apps/
+  vaultrag/      secure retrieval (RAG) for compliance analysts
+  agentflow/     multi-agent support orchestration
+services/
+  auth-service/  RS256 JWT issuance + JWKS
+  pii-proxy/     PII masking + encrypted vault
+  audit-log/     append-only hash-chain audit
+packages/
+  py-shared/     settings, logging, tracing
+docs/
+  adr/           architecture decision records
+  threat-model/  security model
+  compliance/    compliance mapping
+infra/
+  docker-compose/  local Postgres/pgvector, Redis, Jaeger
+```
 
-## Repository structure
-
-- apps/vaultrag — secure retrieval workflows for compliance and analyst-facing search
-- apps/agentflow — multi-agent customer support and operational orchestration
-- services/audit-log — append-only, hash-linked audit service for sensitive actions
-- services/pii-proxy — shared PII redaction and encrypted vault flow for regulated payloads
-- packages/py-shared — common logging, settings, and tracing utilities
-- docs/adr — architecture decisions and trade-offs
-- docs/threat-model — current system risk model and control mapping
-- infra/docker-compose — local environment for Postgres, Redis, and observability tooling
-
-## Security and compliance focus
-
-This project is intentionally aligned with enterprise control needs:
-
-- GDPR for personal data handling and record retention obligations
-- PSD2 for transaction integrity and operational accountability
-- DORA for resilience and auditability of critical digital systems
-- EU AI Act for trustworthy and observable AI behavior in regulated settings
-
-## Local development
-
-See `CONTRIBUTING.md` for full setup and workflow.
+## Quick start
 
 ```bash
 make up      # start Postgres + pgvector, Redis, Jaeger
-make test    # run tests with coverage
-make lint    # ruff + mypy --strict
-make ci      # test + lint + API contract check
+make test    # full suite with coverage
+make demo    # end-to-end VaultRAG demo (needs Ollama running)
+make ci      # test + lint + type-check + contract check
 ```
 
-## Operating principles
+Setup needs Python 3.12 and `uv` — see `CONTRIBUTING.md`.
+
+## Status
+
+| Component | State |
+| --- | --- |
+| `audit-log` | ✅ hash chain (in-memory store) |
+| `auth-service` | ✅ RS256 + JWKS |
+| `pii-proxy` | ✅ masking + AES-GCM vault (in-memory) |
+| `vaultrag` | ✅ ingest + query + redaction + audit (in-memory store) |
+| `agentflow` | ⚠️ session + scoped JWT only (no agents yet) |
+
+Postgres/pgvector persistence is the next layer: prove the pipeline first, then
+persist it.
+
+## Documentation
+
+- `PRD.md` — product requirements and MVP scope (private).
+- `docs/adr/` — architecture decisions and their trade-offs.
+- `docs/threat-model/v1.md` — the security model every change must respect.
+
+## Principles
 
 - privacy by design
 - evidence over opacity
 - security controls first, model features second
-- auditable systems over hidden automation
-- portability across financial and regulated business contexts
-
-This project is intended as a practical foundation for secure AI system design in financial services, with the audit log and governance model acting as the first critical control layer.
+- simple and understandable
