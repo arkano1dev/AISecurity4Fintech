@@ -8,3 +8,9 @@ users:
     password: correct-horse-2
     scopes:
       - chat:send
+  support:
+    password: support-pass
+    scopes:
+      - chat:send
+      - agent:retrieve
+      - agent:action

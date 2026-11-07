@@ -11,6 +11,7 @@ class AgentflowSettings(BaseSettings):
     token_ttl_seconds: int = 900
     audience: str = "agentflow"
     issuer: str = "auth"
+    audit_log_url: str = "http://localhost:8101"
 
 
 settings = AgentflowSettings()

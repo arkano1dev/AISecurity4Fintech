@@ -1,5 +1,6 @@
 name: ci
 
+# Pipeline: test, lint, secrets scan, dependency audit, API contract check.
 on:
   push:
     branches: [main]
