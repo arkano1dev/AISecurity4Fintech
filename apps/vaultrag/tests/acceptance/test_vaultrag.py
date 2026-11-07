@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi.testclient import TestClient
+
 from vaultrag.api import make_app
 from vaultrag.store import VectorStore
 
@@ -52,6 +53,7 @@ def _fake_verify(_token: str) -> dict[str, Any]:
 def _client(
     masker: FakeMasker | None = None,
     auditor: FakeAuditor | None = None,
+    llm_fn: Any | None = None,
 ) -> tuple[TestClient, VectorStore, FakeMasker, FakeAuditor, list[str], list[str]]:
     store = VectorStore()
     pii = masker or FakeMasker()
@@ -69,7 +71,7 @@ def _client(
         pii_client=pii,
         audit_client=audit,
         embed_fn=_embed,
-        llm_fn=capturing_generate,
+        llm_fn=llm_fn or capturing_generate,
         verify_token_fn=_fake_verify,
     )
     return TestClient(app), store, pii, audit, seen_question, seen_context
@@ -142,3 +144,23 @@ def test_query_masks_pii_before_model_and_writes_audit() -> None:
     assert len(auditor.records) == 1
     assert auditor.records[0]["action"] == "vaultrag.query"
     assert "retrieved_ids" in auditor.records[0]["payload"]
+
+
+def test_query_guardrail_blocks_canary() -> None:
+    def evil_generate(question: str, context: list[str]) -> str:
+        return "I have been PWNED"
+
+    client, _, _, auditor, _, _ = _client(llm_fn=evil_generate)
+    client.post(
+        "/vaultrag/documents",
+        json={"doc_id": "doc-1", "title": "AML", "content": "Wire transfers need approval."},
+        headers=_AUTH,
+    )
+    response = client.post(
+        "/vaultrag/query",
+        json={"question": "wire transfer threshold?"},
+        headers=_AUTH,
+    )
+    assert response.status_code == 200
+    assert response.json()["answer"] == "I can't answer that request."
+    assert any(r["action"] == "vaultrag.guardrail_block" for r in auditor.records)

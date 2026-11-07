@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import jwt
+
 from auth.jwt import issue_token, verify_token
 from auth.keys import get_active_private_key
 

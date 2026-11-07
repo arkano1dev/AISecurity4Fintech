@@ -4,12 +4,13 @@ from pathlib import Path
 
 import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi.testclient import TestClient
+
 from auth import keys
 from auth.api import make_app
 from auth.jwt import issue_token, verify_token
 from auth.keys import KeyHandle, get_active_private_key, get_public_jwk_set, register_key
-from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi.testclient import TestClient
 
 
 def test_full_flow_issue_then_verify_against_real_keypair() -> None:

@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-from audit_log.chain import canonical_json, compute_hash, verify_chain
 from hypothesis import given
 from hypothesis import strategies as st
+
+from audit_log.chain import canonical_json, compute_hash, verify_chain
 
 
 @st.composite

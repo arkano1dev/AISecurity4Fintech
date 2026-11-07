@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 import jwt
+
 from audit_log.api import make_app as make_audit_app
 from auth.api import make_app as make_auth_app
 from auth.keys import get_active_private_key

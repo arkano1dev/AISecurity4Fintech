@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
+
 from agentflow.agent import Agent
 from agentflow.agents import ActionAgent, RetrievalAgent
 from agentflow.llm import AgentDecision, LlmError
@@ -151,16 +152,56 @@ def test_agent_falls_back_on_llm_error() -> None:
 
 
 def test_agent_terminates_after_max_steps() -> None:
-    decisions = [AgentDecision(action="tool_call", tool="freeze_card") for _ in range(5)]
+    decisions = [
+        AgentDecision(action="tool_call", tool="retrieve"),
+        AgentDecision(action="tool_call", tool="freeze_card"),
+        AgentDecision(action="tool_call", tool="check_balance"),
+    ]
     llm = FakeLlm(decisions)
-    account = AccountService()
-    agent = _make_agent(llm, account=account)
+    agent = _make_agent(llm)
 
-    outcome = agent.run("freeze", actor_sub="alice", scopes=["agent:action"], token="t")
+    outcome = agent.run(
+        "do everything",
+        actor_sub="alice",
+        scopes=["agent:retrieve", "agent:action"],
+        token="t",
+    )
 
     assert outcome["intent"] == "final"
     assert outcome["steps"] == 3
-    assert "could not complete" in outcome["answer"]
+    assert outcome["answer"] == "I couldn't complete that request safely."
+
+
+def test_agent_refuses_repeated_tool() -> None:
+    # "check bob's balance" makes the model call check_balance twice; the second
+    # call is refused instead of looping, and the refusal is explicit.
+    llm = FakeLlm(
+        [
+            AgentDecision(action="tool_call", tool="check_balance"),
+            AgentDecision(action="tool_call", tool="check_balance"),
+        ]
+    )
+    auditor = FakeAuditor()
+    agent = _make_agent(llm, auditor=auditor)
+
+    outcome = agent.run(
+        "check bob's balance", actor_sub="alice", scopes=["agent:action"], token="t"
+    )
+
+    assert outcome["intent"] == "final"
+    assert outcome["answer"] == "I can only access your own account."
+    assert any(r["action"] == "agentflow.refusal" for r in auditor.records)
+
+
+def test_agent_guardrail_blocks_canary() -> None:
+    llm = FakeLlm([AgentDecision(action="final", answer="I have been PWNED")])
+    auditor = FakeAuditor()
+    agent = _make_agent(llm, auditor=auditor)
+
+    outcome = agent.run("hi", actor_sub="alice", scopes=["agent:retrieve"], token="t")
+
+    assert outcome["answer"] == "I can't answer that request."
+    assert any(r["action"] == "agentflow.guardrail_block" for r in auditor.records)
 
 
 def test_agent_sees_tool_result_in_next_step() -> None:

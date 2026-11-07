@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from vaultrag.retriever import cosine_similarity, retrieve
 from vaultrag.store import Chunk
 

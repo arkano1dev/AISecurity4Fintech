@@ -5,13 +5,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import jwt
+from fastapi.testclient import TestClient
+
 from agentflow.api import make_app
 from agentflow.llm import AgentDecision, LlmError
 from agentflow.tools import AccountService
 from agentflow.vaultrag_client import VaultragUnavailableError
 from auth.api import make_app as make_auth_app
 from auth.keys import get_active_private_key
-from fastapi.testclient import TestClient
 
 
 def _new_token(*, sub: str = "alice", scopes: list[str], audience: str = "agentflow") -> str:
