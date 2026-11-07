@@ -11,12 +11,18 @@ from pii_proxy.vault import SecretVault
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+IBAN_RE = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b")
+PAN_RE = re.compile(r"\b\d{4}(?:[\s-]?\d{4}){3}\b")
+PHONE_RE = re.compile(r"\+?\d{1,3}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{4}")
 
 
 def redact_text(text: str) -> str:
     redacted = text
     for pattern, label in (
         (EMAIL_RE, "[EMAIL]"),
+        (IBAN_RE, "[IBAN]"),
+        (PAN_RE, "[PAN]"),
+        (PHONE_RE, "[PHONE]"),
         (SSN_RE, "[SSN]"),
         (DATE_RE, "[DATE]"),
     ):
