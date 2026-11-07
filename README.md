@@ -78,9 +78,11 @@ before it ever reaches the model. See `apps/vaultrag/README.md`.
 
 ### AgentFlow
 
-A multi-agent assistant for customer support. A supervisor classifies each
-request and routes it to a specialized agent with a scoped JWT. See
-`apps/agentflow/README.md`.
+A multi-agent assistant for customer support and operations. An LLM-driven
+agent loop classifies each request, selects a tool from a fixed allowlist
+(retrieve / freeze_card / check_balance), and executes it sub-keyed and
+audited — with a deterministic keyword fallback if the model is unavailable.
+See `apps/agentflow/README.md`.
 
 ## Shared services
 
