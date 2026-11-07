@@ -11,3 +11,4 @@ This directory tracks the key trade-offs of the platform.
 - [ADR 0005](0005-vaultrag-rag-design.md): VaultRAG retrieval design (in-memory cosine scan, HTTP trust boundaries)
 - [ADR 0006](0006-agentflow-supervisor.md): AgentFlow supervisor (deterministic routing, scope enforcement)
 - [ADR 0007](0007-agentflow-vaultrag-integration.md): AgentFlow delegates retrieval to VaultRAG (token forwarding, VaultRAG auth, defense in depth)
+- [ADR 0008](0008-llm-driven-agent.md): LLM-driven agent loop with bounded tools (JSON allowlist, multi-step, keyword fallback)
