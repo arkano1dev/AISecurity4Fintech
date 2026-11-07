@@ -5,9 +5,10 @@ import json
 from typing import Any, cast
 
 import pytest
+from fastapi.testclient import TestClient
+
 from audit_log.api import make_app
 from audit_log.chain import canonical_json
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture

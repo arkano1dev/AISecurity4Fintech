@@ -5,11 +5,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 import jwt
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+
 from auth.api import make_app
 from auth.deps import require_auth
 from auth.keys import get_active_private_key, get_public_jwk_set
-from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
 
 client = TestClient(make_app())
 

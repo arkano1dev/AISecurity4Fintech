@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
+
 from agentflow.api import make_app
 from auth.api import make_app as make_auth_app
-from fastapi.testclient import TestClient
 
 
 def test_end_to_end_login_then_protected_route() -> None:

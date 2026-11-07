@@ -92,11 +92,12 @@ make demo   # integrated VaultRAG + AgentFlow demo (needs Ollama running)
 - a token without the tool's scope is rejected with 403
 - `check_balance` is sub-keyed and never leaks another user's balance
 - the model never sees raw PII (masked first)
+- a repeated tool call is refused explicitly, never looped to the cap
+- a generated answer with a canary/leak is blocked and audited (`guardrail`)
 - VaultRAG down → 503 `vaultrag_unavailable`
 - an LLM failure falls back to the keyword classifier
 
 ## Out of scope (next)
 
-- Output guardrails / prompt-injection defenses
 - SCA / TOTP for high-value actions
 - Persistence (Postgres)

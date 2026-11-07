@@ -9,6 +9,7 @@ from agentflow.pii_client import Masker
 from agentflow.supervisor import InsufficientScopeError, Supervisor
 from agentflow.tools import AccountService
 from agentflow.vaultrag_client import VaultragQuerier
+from shared.guardrail import REFUSAL, check_output
 
 MAX_STEPS = 3
 
@@ -18,6 +19,14 @@ TOOL_SCOPES: dict[str, str] = {
     "check_balance": "agent:action",
 }
 
+# Explicit refusal when the model repeats a tool (isolation / loop guard).
+REFUSALS: dict[str, str] = {
+    "check_balance": "I can only access your own account.",
+    "freeze_card": "I can only manage your own card.",
+    "retrieve": "I can only search your own documents.",
+}
+GENERIC_REFUSAL = "I couldn't complete that request safely."
+
 
 class Agent:
     """An LLM-driven agent loop over a bounded, sub-keyed tool allowlist.
@@ -25,7 +34,9 @@ class Agent:
     The model selects a tool from the allowlist; the tool then executes with
     arguments bound to the authenticated identity, never to the model's output.
     Every LLM decision and every tool call is audited. If the model fails at the
-    first step, the deterministic keyword classifier takes over.
+    first step, the deterministic keyword classifier takes over. A repeated tool
+    call is refused explicitly rather than allowed to loop, and the final answer
+    passes through a deterministic output guardrail.
     """
 
     def __init__(
@@ -55,6 +66,7 @@ class Agent:
             payload={"agent": "llm", "message_hash": _sha256(masked)},
         )
         history: list[dict[str, Any]] = []
+        called: set[str] = set()
         for step in range(self._max_steps):
             try:
                 decision = self._llm.decide(masked, history)
@@ -63,10 +75,13 @@ class Agent:
                     return self._fallback_result(masked, actor_sub, scopes, token)
                 break
             if decision.action == "final":
-                return self._final(decision, step)
+                return self._final(decision, step, actor_sub)
             tool = decision.tool
             assert tool is not None
+            if tool in called:
+                return self._refusal(tool, step, actor_sub)
             self._enforce_scope(scopes, TOOL_SCOPES[tool])
+            called.add(tool)
             result = self._execute_tool(tool, masked, actor_sub, token)
             self._audit.append(
                 actor_sub=actor_sub,
@@ -78,14 +93,7 @@ class Agent:
                 },
             )
             history.append({"tool": tool, "result": result})
-        return {
-            "intent": "final",
-            "agent": "llm",
-            "answer": "I could not complete that request.",
-            "result": {"answer": "I could not complete that request."},
-            "steps": self._max_steps,
-            "fallback": False,
-        }
+        return self._refusal(None, self._max_steps - 1, actor_sub)
 
     def _execute_tool(self, tool: str, masked: str, actor_sub: str, token: str) -> dict[str, Any]:
         if tool == "retrieve":
@@ -118,9 +126,32 @@ class Agent:
             "fallback": True,
         }
 
-    @staticmethod
-    def _final(decision: AgentDecision, step: int) -> dict[str, Any]:
+    def _final(self, decision: AgentDecision, step: int, actor_sub: str) -> dict[str, Any]:
         answer = decision.answer or ""
+        verdict = check_output(answer)
+        if verdict.blocked:
+            answer = REFUSAL
+            self._audit.append(
+                actor_sub=actor_sub,
+                action="agentflow.guardrail_block",
+                payload={"reason": verdict.reason},
+            )
+        return {
+            "intent": "final",
+            "agent": "llm",
+            "answer": answer,
+            "result": {"answer": answer},
+            "steps": step + 1,
+            "fallback": False,
+        }
+
+    def _refusal(self, tool: str | None, step: int, actor_sub: str) -> dict[str, Any]:
+        answer = REFUSALS.get(tool, GENERIC_REFUSAL) if tool else GENERIC_REFUSAL
+        self._audit.append(
+            actor_sub=actor_sub,
+            action="agentflow.refusal",
+            payload={"tool": tool},
+        )
         return {
             "intent": "final",
             "agent": "llm",

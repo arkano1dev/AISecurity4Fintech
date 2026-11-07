@@ -8,3 +8,4 @@
 - [x] A1/A2 AgentFlow supervisor + scoped agents + audited freeze_card
 - [x] A4 AgentFlow → VaultRAG delegation + check_balance + sub-keyed isolation
 - [x] A5 LLM-driven agent loop with bounded tools (multi-step + fallback)
+- [x] A6 Prompt-injection protection (output guardrail + delimited context) + graceful errors

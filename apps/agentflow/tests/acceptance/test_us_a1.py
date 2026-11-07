@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from fastapi.testclient import TestClient
+
 from agentflow.api import make_app
 from auth.api import make_app as make_auth_app
 from auth.keys import get_active_private_key
-from fastapi.testclient import TestClient
 
 
 def _new_token(*, scopes: list[str], exp_delta: timedelta, audience: str = "agentflow") -> str:

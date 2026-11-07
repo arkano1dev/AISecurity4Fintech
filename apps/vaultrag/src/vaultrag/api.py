@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.guardrail import REFUSAL, check_output
 from vaultrag.auth import TokenVerifier, require_auth
 from vaultrag.chunker import chunk_text
 from vaultrag.clients import AuditClient, Auditor, Masker, PiiClient
@@ -114,6 +115,14 @@ def make_app(
         hits = retrieve(store_obj.chunks(), question_embedding, settings.top_k)
         context = [chunk.text for _, chunk in hits]
         answer_text = generate(masked_question, context)
+        verdict = check_output(answer_text)
+        if verdict.blocked:
+            answer_text = REFUSAL
+            audit.append(
+                actor_sub="analyst",
+                action="vaultrag.guardrail_block",
+                payload={"reason": verdict.reason},
+            )
         citations = [
             Citation(doc_id=chunk.doc_id, chunk_id=chunk.chunk_id, text=chunk.text)
             for _, chunk in hits

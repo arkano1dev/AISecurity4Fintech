@@ -12,3 +12,4 @@ This directory tracks the key trade-offs of the platform.
 - [ADR 0006](0006-agentflow-supervisor.md): AgentFlow supervisor (deterministic routing, scope enforcement)
 - [ADR 0007](0007-agentflow-vaultrag-integration.md): AgentFlow delegates retrieval to VaultRAG (token forwarding, VaultRAG auth, defense in depth)
 - [ADR 0008](0008-llm-driven-agent.md): LLM-driven agent loop with bounded tools (JSON allowlist, multi-step, keyword fallback)
+- [ADR 0009](0009-output-guardrail.md): deterministic output guardrail + delimited untrusted context + explicit refusal on repeated tool calls

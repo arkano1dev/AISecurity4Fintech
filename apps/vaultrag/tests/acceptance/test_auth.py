@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi.testclient import TestClient
+
 from vaultrag.api import make_app
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from audit_log.store import AuditLogStore
 
 
