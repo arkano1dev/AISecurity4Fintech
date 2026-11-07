@@ -1,4 +1,4 @@
-.PHONY: test lint format contract ci up down demo
+.PHONY: test lint format contract ci up down demo demo-vaultrag demo-agentflow
 
 # Local commands aligned with the CI jobs (.github/workflows/ci.yml).
 # Dependencies are installed with uv — see CONTRIBUTING.md.
@@ -27,3 +27,10 @@ down:
 
 demo:
 	uv run python scripts/demo_vaultrag.py
+	uv run python scripts/demo_agentflow.py
+
+demo-vaultrag:
+	uv run python scripts/demo_vaultrag.py
+
+demo-agentflow:
+	uv run python scripts/demo_agentflow.py
