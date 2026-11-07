@@ -53,6 +53,7 @@ Redaction happens **before** embedding, so raw PII never enters the store.
 | `store.py` | in-memory `Chunk` + `VectorStore` |
 | `llm.py` | grounded answer via the Ollama chat API |
 | `clients.py` | HTTP clients for `pii-proxy` and `audit-log` |
+| `auth.py` | scoped JWT verification (`vaultrag:ingest` / `vaultrag:query`) |
 | `settings.py` | typed config (`VAULTRAG_` env prefix) |
 | `api.py` | FastAPI app with injectable dependencies |
 
@@ -80,6 +81,11 @@ Needs Ollama running with `nomic-embed-text` and the configured chat model.
 | `VAULTRAG_CHUNK_SIZE` | `500` |
 | `VAULTRAG_CHUNK_OVERLAP` | `50` |
 | `VAULTRAG_TOP_K` | `4` |
+| `VAULTRAG_AUTH_SERVICE_URL` | `http://localhost:8000` |
+
+Both endpoints require a scoped JWT: ingest requires `vaultrag:ingest`, query
+requires `vaultrag:query`. Tokens are verified locally against the auth-service
+JWKS.
 
 ## Tested invariants
 
@@ -87,7 +93,8 @@ Needs Ollama running with `nomic-embed-text` and the configured chat model.
 
 - ingest redacts PII before it is embedded,
 - query returns an answer and citations,
-- query masks PII before the model and writes an audit record.
+- query masks PII before the model and writes an audit record,
+- a token without the required scope is rejected (401/403).
 
 `tests/unit/` covers the chunker (overlap, empty input, bad overlap) and the
 retriever (cosine similarity, top-k ordering).
@@ -96,5 +103,5 @@ retriever (cosine similarity, top-k ordering).
 
 - Postgres/pgvector persistence (in-memory today)
 - Hybrid BM25 + dense retrieval
-- Tenant isolation and auth
+- Tenant (row-level) isolation
 - PDF ingestion

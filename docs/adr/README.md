@@ -10,3 +10,4 @@ This directory tracks the key trade-offs of the platform.
 - [ADR 0004](0004-agentflow-uses-cached-jwks.md): AgentFlow verifies tokens with a cached JWKS
 - [ADR 0005](0005-vaultrag-rag-design.md): VaultRAG retrieval design (in-memory cosine scan, HTTP trust boundaries)
 - [ADR 0006](0006-agentflow-supervisor.md): AgentFlow supervisor (deterministic routing, scope enforcement)
+- [ADR 0007](0007-agentflow-vaultrag-integration.md): AgentFlow delegates retrieval to VaultRAG (token forwarding, VaultRAG auth, defense in depth)
