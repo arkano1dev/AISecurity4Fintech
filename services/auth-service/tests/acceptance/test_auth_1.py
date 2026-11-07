@@ -28,7 +28,7 @@ def test_valid_credentials_return_scoped_jwt() -> None:
     assert payload["iss"] == "auth"
     assert payload["aud"] == "agentflow"
     assert payload["jti"]
-    assert payload["scopes"] == ["chat:send", "account:read"]
+    assert payload["scopes"] == ["chat:send", "account:read", "agent:action"]
     assert payload["exp"] > datetime.now(UTC).timestamp()
 
     header = jwt.get_unverified_header(token)
