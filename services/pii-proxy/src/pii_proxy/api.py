@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 import re
+from typing import Annotated, Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
 
+from pii_proxy.auth import TokenVerifier, require_auth
 from pii_proxy.models import MaskRequest, MaskResponse, VaultRequest, VaultResponse
 from pii_proxy.vault import SecretVault
 
@@ -30,7 +30,7 @@ def redact_text(text: str) -> str:
     return redacted
 
 
-def make_app() -> FastAPI:
+def make_app(*, verify_token_fn: TokenVerifier | None = None) -> FastAPI:
     app = FastAPI(title="PII Proxy")
     app.state.vault = SecretVault()
 
@@ -43,12 +43,24 @@ def make_app() -> FastAPI:
         return MaskResponse(redacted=redact_text(payload.text))
 
     @app.post("/pii/vault", response_model=VaultResponse, status_code=201)
-    def store(payload: VaultRequest) -> VaultResponse:
+    def store(
+        payload: VaultRequest,
+        _auth: Annotated[
+            dict[str, Any],
+            Depends(require_auth(["pii:store"], verify_token_fn)),
+        ],
+    ) -> VaultResponse:
         receipt = app.state.vault.store(payload.record_type, payload.payload)
         return VaultResponse(receipt=receipt, message="stored")
 
     @app.get("/pii/receipt/{receipt}", response_model=None)
-    def fetch_receipt(receipt: str) -> dict[str, object] | JSONResponse:
+    def fetch_receipt(
+        receipt: str,
+        _auth: Annotated[
+            dict[str, Any],
+            Depends(require_auth(["pii:read"], verify_token_fn)),
+        ],
+    ) -> dict[str, object] | JSONResponse:
         record = app.state.vault.get(receipt)
         if record is None:
             return JSONResponse(status_code=404, content={"detail": "receipt not found"})

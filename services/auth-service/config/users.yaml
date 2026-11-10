@@ -16,6 +16,8 @@ users:
       - agent:retrieve
       - agent:action
       - vaultrag:query
+      - pii:store
+      - pii:read
   loader:
     password: loader-pass
     scopes:
