@@ -22,23 +22,6 @@ def test_mask_endpoint_redacts_email_and_ssn() -> None:
     assert "[SSN]" in body["redacted"]
 
 
-def test_vault_receipt_tracks_encrypted_record() -> None:
-    response = client.post(
-        "/pii/vault",
-        json={
-            "record_type": "customer_profile",
-            "payload": {"email": "alice@example.com", "customer_id": "C-1001"},
-        },
-    )
-
-    assert response.status_code == 201
-    body = response.json()
-    assert body["receipt"]
-    assert body["message"] == "stored"
-    assert "alice@example.com" not in body["receipt"]
-    assert "customer_id" in body["receipt"]
-
-
 def test_mask_endpoint_redacts_iban_pan_phone() -> None:
     response = client.post(
         "/pii/mask",

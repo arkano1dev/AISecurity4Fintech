@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 from hashlib import sha256
+from typing import Any, cast
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -35,7 +36,6 @@ class SecretVault:
         ciphertext = self._cipher.encrypt(nonce, json.dumps(body, sort_keys=True).encode(), None)
         self._records[receipt] = {
             "record_type": record_type,
-            "payload": payload,
             "nonce": base64.b64encode(nonce).decode(),
             "ciphertext": base64.b64encode(ciphertext).decode(),
         }
@@ -49,5 +49,11 @@ class SecretVault:
             sort_keys=True,
         )
 
-    def get(self, receipt: str) -> dict[str, object] | None:
-        return self._records.get(receipt)
+    def get(self, receipt: str) -> dict[str, Any] | None:
+        record = self._records.get(receipt)
+        if record is None:
+            return None
+        nonce = base64.b64decode(str(record["nonce"]).encode())
+        ciphertext = base64.b64decode(str(record["ciphertext"]).encode())
+        plaintext = self._cipher.decrypt(nonce, ciphertext, None)
+        return cast(dict[str, Any], json.loads(plaintext.decode()))
